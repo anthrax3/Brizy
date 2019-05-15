@@ -58,7 +58,6 @@ class Brizy_Shortcode_PostField extends Brizy_Shortcode_AbstractShortcode {
 			case 'post_content':
 				$GLOBALS['post'] = $post;
 				setup_postdata($post);
-
 				add_filter( 'the_content', 'wpautop' );
 				remove_filter( 'the_content', [ Brizy_Admin_Templates::_init(), 'filterPageContent' ], - 12000 );
 
