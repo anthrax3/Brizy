@@ -171,7 +171,7 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 			do_action( 'brizy_global_block_created', $block );
 			do_action( 'brizy_global_data_updated' );
 
-			$this->success( Brizy_Editor_Block::postData($block->createResponse()) );
+			$this->success( Brizy_Editor_Block::postData( $block ->createResponse()) );
 
 		} catch ( Exception $exception ) {
 			$this->error( 400, $exception->getMessage() );
@@ -210,7 +210,7 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 			do_action( 'brizy_saved_block_created', $block );
 			do_action( 'brizy_global_data_updated' );
 
-			$this->success( Brizy_Editor_Block::postData($block->createResponse()) );
+			$this->success( Brizy_Editor_Block::postData( $block ->createResponse()) );
 
 		} catch ( Exception $exception ) {
 			$this->error( 400, $exception->getMessage() );
@@ -256,7 +256,7 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 			$rulesData = stripslashes( $this->param( 'rules' ) );
 			$rules     = $this->ruleManager->createRulesFromJson( $rulesData, Brizy_Admin_Blocks_Main::CP_GLOBAL );
 
-			$this->ruleManager->setRules( $block->getWpPostId(), $rules );
+			$this->ruleManager->setRules( $block->getWpPostId( ),$rules );
 
 			if ( (int) $this->param( 'is_autosave' ) ) {
 				$block->save( 1 );
@@ -266,7 +266,7 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 				do_action( 'brizy_global_data_updated' );
 			}
 
-			$this->success( $block->createResponse() );
+			$this->success(  $block ->createResponse() );
 		} catch ( Exception $exception ) {
 			$this->error( 400, $exception->getMessage() );
 		}
@@ -315,7 +315,7 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 				do_action( 'brizy_saved_data_updated' );
 			}
 
-			$this->success( $block->createResponse() );
+			$this->success(  $block ->createResponse() );
 		} catch ( Exception $exception ) {
 			$this->error( 400, $exception->getMessage() );
 		}
@@ -369,21 +369,21 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 			$this->error( '400', 'Invalid data version' );
 		}
 
-		$positions      = file_get_contents( "php://input" );
+		$data = file_get_contents( "php://input" );
 
-		$positionObject = json_decode( $positions );
+		$dataObject = json_decode( $data );
 
-		if(!$positionObject) {
-			$this->error(400,'Invalid position data provided');
+		if ( ! $dataObject || !$dataObject->blocks ) {
+			$this->error( 400, 'Invalid position data provided' );
 		}
 
 		$wpdb->query( 'START TRANSACTION' );
 
 		try {
 
-			foreach ( get_object_vars( $positionObject ) as $uid => $position ) {
+			foreach ( get_object_vars( $dataObject->blocks ) as $uid => $position ) {
 
-				if ( !(isset($position->top) && isset($position->bottom) && isset($position->align)) ) {
+				if ( ! ( isset( $position->top ) && isset( $position->bottom ) && isset( $position->align ) ) ) {
 					throw  new Exception();
 				}
 
@@ -391,12 +391,16 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 
 				$block = $this->getBlock( $uid, Brizy_Admin_Blocks_Main::CP_GLOBAL );
 
-				if(!$block) {
+				if ( ! $block ) {
 					throw  new Exception();
 				}
 
 				$block->setPosition( $positionObj );
-				$block->save();
+				if ( isset( $dataObject->is_autosave ) && $dataObject->is_autosave == 1 ) {
+					$block->auto_save_post();
+				} else {
+					$block->save();
+				}
 
 				do_action( 'brizy_global_block_updated', $block );
 			}
@@ -410,7 +414,7 @@ class Brizy_Admin_Blocks_Api extends Brizy_Admin_AbstractApi {
 			$this->error( '400', 'Unable to save block positions' );
 		}
 
-		$this->success( json_encode( $positionObject ) );
+		$this->success( json_encode( $dataObject ) );
 	}
 
 
