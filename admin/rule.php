@@ -15,29 +15,29 @@ class Brizy_Admin_Rule extends Brizy_Admin_Serializable implements Brizy_Admin_R
 	/**
 	 * @var int
 	 */
-	private $id;
+	protected $id;
 
 	/**
 	 * @var int
 	 */
-	private $type;
+	protected $type;
 
 	/**
 	 * @var int
 	 */
-	private $appliedFor;
+	protected $appliedFor;
 
 	/**
 	 * @var string
 	 */
-	private $entityType;
+	protected $entityType;
 
 	/**
 	 * If null the rule will be applied on all entities
 	 *
 	 * @var int[]
 	 */
-	private $entityValues = array();
+	protected $entityValues = array();
 
 	/**
 	 * @return array|mixed
@@ -113,7 +113,7 @@ class Brizy_Admin_Rule extends Brizy_Admin_Serializable implements Brizy_Admin_R
 		// check if post is in a term
 		if ( $applyFor == self::POSTS &&
 		     $this->getAppliedFor() == self::POSTS &&
-		     isset( $entity_values[0] ) && is_array($values = explode( '|', $entity_values[0] )) && count( $values ) > 1
+		     isset( $entity_values[0] ) && is_array( $values = explode( '|', $entity_values[0] ) ) && count( $values ) > 1
 		) {
 
 			// check if the post is in taxonomy with name $values[0] and with id $values[1]
@@ -367,6 +367,13 @@ class Brizy_Admin_Rule extends Brizy_Admin_Serializable implements Brizy_Admin_R
 			isset( $json->entityType ) ? $json->entityType : null,
 			isset( $json->entityValues ) ? $json->entityValues : null
 		);
+	}
+
+	/**
+	 * @return string
+	 */
+	public function serialize() {
+		return serialize( $this->convertToOptionValue() );
 	}
 
 
