@@ -130,7 +130,7 @@ class ApiCest {
 		$I->assertArrayHasKey( 'dataVersion', $project, 'It should return the project dataVersion' );
 
 		$check = Brizy_Editor::get()->checkIfProjectIsLocked();
-		$I->assertFalse( $check!==false, 'It should be return false as the project is not locked' );
+		$I->assertFalse( $check !== false, 'It should be return false as the project is not locked' );
 	}
 
 	/**
@@ -281,7 +281,7 @@ class ApiCest {
 		$I->seeResponseCodeIs( 200 );
 
 		$check = Brizy_Editor::get()->checkIfProjectIsLocked();
-		$I->assertTrue( $check!==false, 'It should be return true as the project is locked' );
+		$I->assertTrue( $check !== false, 'It should be return true as the project is locked' );
 	}
 
 	public function removeLockTest( FunctionalTester $I ) {
@@ -397,6 +397,31 @@ class ApiCest {
 			] ) );
 
 		$I->seeResponseCodeIs( 404 );
+	}
+
+	public function getPlaceholderContentTest( FunctionalTester $I ) {
+
+		$postId = $I->havePostInDatabase( [
+			'post_type'    => 'page',
+			'post_title'   => 'Title {{n}}',
+			'post_content' => 'Page content'
+		] );
+
+		$permalink = get_permalink($postId);
+
+		// test with invalid attachment
+		$I->sendAjaxGetRequest( 'wp-admin/admin-ajax.php?' . build_query( [
+				'post'        => $postId,
+				'action'      => 'brizy_placeholder_content',
+				'version'     => BRIZY_EDITOR_VERSION,
+				'placeholder' => '{{brizy_dc_permalink post_id=\''.$postId.'\'}}'
+			] ) );
+		$I->seeResponseCodeIsSuccessful();
+
+		$response = $I->grabResponse();
+		$response = json_decode( $response );
+
+		$I->assertStringNotContainsString('{{brizy_dc_permalink post_id=\''.$postId.'\'}}',$response->data->placeholder,'Is should replace the place holder with the post permalink');
 	}
 
 }

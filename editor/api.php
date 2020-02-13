@@ -13,6 +13,7 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 	const AJAX_SIDEBARS = 'brizy_sidebars';
 	const AJAX_SIDEBAR_CONTENT = 'brizy_sidebar_content';
 	const AJAX_SHORTCODE_CONTENT = 'brizy_shortcode_content';
+	const AJAX_PLACEHOLDER_CONTENT = 'brizy_placeholder_content';
 	const AJAX_GET_POST_OBJECTS = 'brizy_get_posts';
 	const AJAX_GET_MENU_LIST = 'brizy_get_menu_list';
 	const AJAX_GET_TERMS = 'brizy_get_terms';
@@ -76,6 +77,7 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 			add_action( 'wp_ajax_' . self::AJAX_LOCK_PROJECT, array( $this, 'lock_project' ) );
 			add_action( 'wp_ajax_' . self::AJAX_SIDEBARS, array( $this, 'get_sidebars' ) );
 			add_action( 'wp_ajax_' . self::AJAX_SHORTCODE_CONTENT, array( $this, 'shortcode_content' ) );
+			add_action( 'wp_ajax_' . self::AJAX_PLACEHOLDER_CONTENT, array( $this, 'placeholder_content' ) );
 			add_action( 'wp_ajax_' . self::AJAX_GET_POST_OBJECTS, array( $this, 'get_post_objects' ) );
 			add_action( 'wp_ajax_' . self::AJAX_GET_MENU_LIST, array( $this, 'get_menu_list' ) );
 			add_action( 'wp_ajax_' . self::AJAX_GET_TERMS, array( $this, 'get_terms' ) );
@@ -336,7 +338,7 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 		try {
 			$this->verifyNonce( self::nonce );
 
-			$postId        = (int) $this->param( 'post_id' ) ;
+			$postId        = (int) $this->param( 'post_id' );
 			$defaultFields = [ 'ID', 'post_title', 'post_content' ];
 			$post_fields   = array_intersect( $this->param( 'fields' ), $defaultFields );
 
@@ -350,7 +352,7 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 
 			$post = get_post( $postId, ARRAY_A );
 
-			if(!$post) {
+			if ( ! $post ) {
 				$this->error( 404, 'Invalid post id' );
 			}
 
@@ -418,6 +420,121 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 		} catch ( Exception $exception ) {
 			Brizy_Logger::instance()->exception( $exception );
 			$this->error( $exception->getCode(), $exception->getMessage() );
+		}
+	}
+
+	public function placeholder_content() {
+		try {
+			$this->verifyNonce( self::nonce );
+			$placeholder = '';
+			$postId      = $this->param( 'post' );
+			$placeholder = stripslashes( $this->param( 'placeholder' ) );
+			if ( ! $placeholder ) {
+				throw new Exception( 'Placeholder string not provided.', 400 );
+			}
+			$post = $this->getPostSample( $postId );
+
+			$content = apply_filters( 'brizy_content', $placeholder, Brizy_Editor_Project::get(), $post );
+
+			$this->success( array(
+				'placeholder' => $content
+			) );
+
+		} catch ( Exception $exception ) {
+			Brizy_Logger::instance()->exception( $exception );
+			$this->error( $exception->getCode(), $exception->getMessage() );
+		}
+	}
+
+	private function getPostSample( $templateId ) {
+		$wp_post = get_post( $templateId );
+		if ( $wp_post->post_type !== Brizy_Admin_Templates::CP_TEMPLATE ) {
+			return $wp_post;
+		}
+
+
+		$ruleManager = new Brizy_Admin_Rules_Manager();
+		$rules       = $ruleManager->getRules( $wp_post->ID );
+		$rule        = null;
+
+		// find first include rule
+		foreach ( $rules as $rule ) {
+			/**
+			 * @var Brizy_Admin_Rule $rule ;
+			 */
+			if ( $rule->getType() == Brizy_Admin_Rule::TYPE_INCLUDE ) {
+				break;
+			}
+		}
+
+		if ( $rule ) {
+
+			switch ( $rule->getAppliedFor() ) {
+				case  Brizy_Admin_Rule::POSTS :
+					$args = array(
+						'post_type' => $rule->getEntityType(),
+					);
+
+					if ( count( $rule->getEntityValues() ) ) {
+						$args['post__in'] = $rule->getEntityValues();
+					}
+					$array = get_posts( $args );
+
+					return array_pop( $array );
+					break;
+				case Brizy_Admin_Rule::TAXONOMY :
+					$args = array(
+						'taxonomy'   => $rule->getEntityType(),
+						'hide_empty' => false,
+					);
+					if ( count( $rule->getEntityValues() ) ) {
+						$args['term_taxonomy_id'] = $rule->getEntityValues();
+					}
+
+					$array = get_terms( $args );
+
+					return array_pop( $array );
+					break;
+				case  Brizy_Admin_Rule::ARCHIVE :
+					return null;
+					break;
+				case  Brizy_Admin_Rule::TEMPLATE :
+
+					switch ( $rule->getEntityType() ) {
+						case 'author':
+							$authors = get_users();
+							$author  = array_pop( $authors );
+							$link    = get_author_posts_url( $author->ID );
+
+							return addQueryStringToUrl( $link, 'preview=1' );
+							break;
+
+						case '404':
+						case 'search':
+							return null;
+							break;
+
+							return addQueryStringToUrl( get_home_url( null, (string) time() ), 'preview=1' );
+							break;
+						case 'home_page':
+							$get_option = get_option( 'page_for_posts' );
+
+							if ( $get_option ) {
+								return get_post( $get_option );
+							}
+							break;
+						case 'front_page':
+							$get_option = get_option( 'page_on_front' );
+
+							if ( $get_option ) {
+								return get_post( $get_option );
+							}
+							break;
+					}
+
+					break;
+			}
+
 		}
 	}
 
@@ -499,7 +616,7 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 				'uid'             => $this->create_uid( $post->ID ),
 				'post_type'       => $post->post_type,
 				'post_type_label' => $wp_post_types[ $post->post_type ]->label,
-				'title'      => apply_filters( 'the_title', $post->post_title ),
+				'title'           => apply_filters( 'the_title', $post->post_title ),
 				'post_title'      => apply_filters( 'the_title', $post->post_title )
 			);
 		}
@@ -684,14 +801,14 @@ class Brizy_Editor_API extends Brizy_Admin_AbstractApi {
 		$closure = function ( $v ) {
 			return array(
 				'title'      => $v->name,
-				'value'      => $v->taxonomy."|".$v->term_id,
+				'value'      => $v->taxonomy . "|" . $v->term_id,
 				'groupValue' => $v->taxonomy
 			);
 		};
 
 		foreach ( $taxonomies as $tax ) {
 			$groups[] = array(
-				'title' => __("From",'brizy')." ".$tax->labels->singular_name,
+				'title' => __( "From", 'brizy' ) . " " . $tax->labels->singular_name,
 				'value' => Brizy_Admin_Rule::ALL_FROM_TAXONOMY,
 				'items' => array_map( $closure, get_terms( [ 'taxonomy' => $tax->name, 'hide_empty' => false ] ) )
 			);
